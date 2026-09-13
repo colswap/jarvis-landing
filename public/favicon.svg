@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 챔퍼 판 위의 아크. 둥근 모서리는 쓰지 않는다. -->
+  <polygon points="5,2 27,2 30,5 30,27 27,30 5,30 2,27 2,5" fill="#05070A"/>
+  <polygon points="5,2 27,2 30,5 30,27 27,30 5,30 2,27 2,5" fill="none" stroke="#1C6E8C" stroke-width="2"/>
+  <path d="M 16 7 A 9 9 0 1 1 7 16" fill="none" stroke="#35C9FF" stroke-width="3"/>
+  <rect x="14.5" y="14.5" width="3" height="3" fill="#CFF4FF"/>
+</svg>

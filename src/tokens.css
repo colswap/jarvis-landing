@@ -1,0 +1,120 @@
+/*
+ * 토큰 한 벌. **색 리터럴은 이 블록 밖에 하나도 두지 않는다** — deck.css 가 색을
+ * 전부 deck-tokens.js 로 뺀 것과 같은 이유다("두 곳에 적으면 한 곳은 반드시 낡는다").
+ *
+ * ⚠️ 정본은 여기가 아니다.
+ *      팔레트·유리·상태색   JARVIS/apps/jarvis-orchestrator/public/panel-tokens.js
+ *      글자 사다리·선·질감   JARVIS/apps/jarvis-orchestrator/public/deck-tokens.js
+ *    옮겨 적은 이상 낡을 수 있다. 그쪽이 바뀌면 같은 커밋에서 여기도 바꾼다.
+ */
+:root {
+  color-scheme: dark;
+
+  /* ── 팔레트 (panel-tokens.js PALETTE) ───────────────────── */
+  --base: #05070a;
+  --surface: #0c1420;
+  --accent: #35c9ff;
+  --accent-dim: #1c6e8c;
+  --hot: #cff4ff;
+  --warn: #ffb020;
+  /* 본문에 섞이는 앰버. 칩의 앰버보다 밝다 — 읽혀야 하는 글자라서 (WAITING_TEXT) */
+  --warn-text: #ffd48a;
+
+  /* ── 유리 (panel-tokens.js GLASS) ───────────────────────── */
+  --glass: rgba(12, 20, 32, 0.88); /* GLASS.alpha = 0.88, 퀘스트 실기에서 잡은 값 */
+
+  /* ── 유리면 질감 (deck-tokens.js SURFACE_FX) ──────────────
+     panel 쪽 값이 아니라 **덱 쪽 값**을 쓴다. 덱이 더 큰 면이고 이 페이지도 그렇다 —
+     큰 면일수록 같은 알파가 더 눈에 띈다.  (panel: innerGlow 0.10 · scan 0.026) */
+  --glow-inner: rgba(53, 201, 255, 0.085);
+  --scan: rgba(53, 201, 255, 0.022);
+
+  /* ── 스캔 기하 (deck.css :root — 8u · 1u) ─────────────────
+     색이 아니라 질감의 크기라 기하는 CSS 쪽에 있다. 앱의 8dp·1dp @1800dp/m 과 같은 비율. */
+  --scan-pitch: 8px;
+  --scan-width: 1px;
+
+  /* 글자 선택 영역. RULE.strong 을 그대로 쓴다 — 새 알파를 만들지 않는다 */
+  --select: rgba(53, 201, 255, 0.26);
+
+  /* ── 글자 밝기 사다리 (deck-tokens.js INK) ─────────────────
+     네 칸인 것은 크기 단계가 넷인 것과 같은 이유다. 순백은 쓰지 않는다. */
+  --ink: rgba(230, 246, 255, 0.94);
+  --ink-2: rgba(230, 246, 255, 0.82);
+  --ink-3: rgba(127, 168, 192, 0.96);
+  /* 0.70(정본) → 0.78. 정본에서 벗어난 유일한 값이고 이유가 있다: 덱은 1170u 캔버스에
+     20u 본문이라 이 색이 큰 글자에 붙지만, 웹에서는 11~13px 메타 글자에 붙어
+     0.70 이면 #05070A 위 4.30:1 로 WCAG 4.5:1 을 못 넘는다. 0.78 이면 ≈4.6:1. */
+  --ink-4: rgba(127, 168, 192, 0.78);
+
+  /* ── 선 (RULE). FUI 의 선은 회색이 아니라 옅은 시안 발광선이다 ── */
+  --rule: rgba(53, 201, 255, 0.26);
+  --rule-soft: rgba(53, 201, 255, 0.1);
+
+  /* ── 모서리. 반경이 아니라 챔퍼다 ─────────────────────────
+     둥근 모서리는 안드로이드 카드로 보이고 잘린 모서리는 계기로 보인다 (§7.4).
+     border-radius 는 이 사이트에 0 회다. */
+  --chamfer: 14px;
+  --edge: 2px;
+  --chamfer-in: calc(var(--chamfer) - var(--edge));
+
+  /* ── 크기 단계는 넷 (deck.css 와 같다. 다섯째를 만들지 않는다) ──
+     --t-label 은 다섯째 단계가 아니라 --t-meta 의 대문자 보정이다:
+     Rajdhani 대문자는 같은 px 에서 한글 본문보다 커 보인다. */
+  --t-display: clamp(38px, 5.4vw, 58px);
+  --t-title: clamp(26px, 3.2vw, 34px);
+  --t-body: 17px;
+  --t-meta: 13px;
+  --t-label: 11px;
+
+  --font-body: "Pretendard Variable", Pretendard, "Noto Sans KR", system-ui, sans-serif;
+  --font-label: "Rajdhani", "Roboto Condensed", system-ui, sans-serif;
+  --font-display: "Orbitron Variable", "Rajdhani", system-ui, sans-serif;
+
+  /* ── 레이아웃 3트랙. 셋째 트랙에는 글자를 한 자도 넣지 않는다 ── */
+  --rail: 232px;
+  --gutter: 56px;
+  --body-col: 760px;
+
+  /* 레일 눈금의 밝기 사다리는 CONVEYOR.doneOpacity(0.55/0.38/0.26) 가 아니라
+     INK 사다리를 쓴다. 컨베이어 값은 **글이 아닌 행**의 값이다 — 눈금은 실제 링크라
+     0.26 을 곱하면 대비가 1.48:1 로 떨어져 안 보이는 내비게이션이 된다.
+     "꺼진 계기" 의 뜻은 밝기를 낮추는 것이고(STATE_COLOR.done), INK 사다리가 이미 그것이다. */
+
+  /* 컨베이어의 모든 전환 (MOTION) */
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur: 500ms;
+}
+
+/* 챔퍼 실루엣. 여덟 점으로 네 모서리를 다 자른다 (deck.css --clip-outer 그대로).
+   ↩︎ 되돌림: 모서리가 이상하면 .instr / .instr::before / .instr::after 의
+      clip-path 세 줄을 지운다. 모서리만 직각으로 돌아가고 나머지는 전부 산다. */
+:root {
+  --clip-outer: polygon(
+    var(--chamfer) 0,
+    calc(100% - var(--chamfer)) 0,
+    100% var(--chamfer),
+    100% calc(100% - var(--chamfer)),
+    calc(100% - var(--chamfer)) 100%,
+    var(--chamfer) 100%,
+    0 calc(100% - var(--chamfer)),
+    0 var(--chamfer)
+  );
+  --clip-inner: polygon(
+    var(--chamfer-in) 0,
+    calc(100% - var(--chamfer-in)) 0,
+    100% var(--chamfer-in),
+    100% calc(100% - var(--chamfer-in)),
+    calc(100% - var(--chamfer-in)) 100%,
+    var(--chamfer-in) 100%,
+    0 calc(100% - var(--chamfer-in)),
+    0 var(--chamfer-in)
+  );
+}
+
+@media (max-width: 1439px) and (min-width: 1200px) {
+  :root { --gutter: 48px; --body-col: 700px; }
+}
+@media (max-width: 1199px) and (min-width: 900px) {
+  :root { --rail: 156px; --gutter: 36px; --body-col: 620px; }
+}

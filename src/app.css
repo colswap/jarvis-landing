@@ -1,0 +1,514 @@
+/*
+ * 계기판 프리미티브. 8점 폴리곤·발광 테두리 같은 것은 유틸리티 문자열로 흩뿌리지 않고
+ * 실명 클래스 한 곳에 둔다 — 흩뿌리면 되돌림 지점(tokens.css 의 ↩︎)이 사라진다.
+ */
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    /* deck.css 는 배경을 안 칠한다 — 칠하면 패널 quad 전체가 회색 판이 되고 패스스루가 죽는다.
+       웹에는 패스스루가 없으므로 여기서는 칠한다. 유리 알파 0.88 은 이 색 위에서 그대로 유효하다.
+       이 주석이 없으면 다음 사람이 "덱은 transparent 인데" 로 되돌린다. */
+    background: var(--base);
+    color: var(--ink-2);
+    font-family: var(--font-body);
+    font-size: var(--t-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    /* 한국어는 어절 안에서 끊으면 안 된다 — 기본값이면 "끝난/다" 로 잘린다 */
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
+  ::selection { background: var(--select); color: var(--hot); }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  /* clip-path 가 걸린 요소는 outline 이 통째로 잘려 나간다(페인트 결과 전체가 클립된다).
+     잘리지 않는 **안쪽** 링으로 바꾼다 — 두 CTA 의 키보드 포커스가 여기 달려 있다. */
+  .stat-row:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 40px var(--glow-inner);
+  }
+}
+
+@layer components {
+  /* ── 3트랙. 좌 40 / 우 (1fr) 의 불균등이 레이아웃의 뼈대다 ─────────── */
+  .shell {
+    max-width: 1480px;
+    margin: 0 auto;
+    padding-left: 40px;
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, var(--body-col)) 1fr;
+    column-gap: var(--gutter);
+    align-items: start;
+  }
+  /* main 은 2~3 트랙을 함께 차지한다. 글은 .col 이 760px 로 묶고, 셋째 트랙은
+     글자 없이 비워 둔다 — 아크가 나가는 자리다. */
+  .shell > main { grid-column: 2 / -1; min-width: 0; }
+  .col { max-width: var(--body-col); }
+
+  /* ── 좌측 베젤 ──────────────────────────────────────────── */
+  .bezel {
+    grid-column: 1;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 40px 0 32px;
+  }
+  /* 각인. 사이트에서 표제 글꼴을 쓰는 두 자리 중 하나다.
+     자간을 크게 벌린 것이 여기서는 글꼴보다 큰 몫을 한다. */
+  .stamp {
+    font-family: var(--font-display);
+    font-weight: 700;
+    /* 크기 단계를 새로 만들지 않는다 — 각인의 무게는 크기가 아니라 자간이 진다.
+       (정본 deck.css `.deck-head b` 도 --t-meta 에 자간 2.8u 다) */
+    font-size: var(--t-meta);
+    letter-spacing: 3.4px;
+    color: var(--ink);
+    line-height: 1;
+  }
+
+  /* 구획 레일 — 오른쪽으로 사라지는 발광선. 1px 로 내리지 않는다(hairline 금지, C5) */
+  .rail {
+    height: 2px;
+    background: linear-gradient(90deg, var(--rule) 0%, var(--rule-soft) 58%, transparent 100%);
+  }
+
+  /* 눈금 사다리. 활성 칸만 밝고 나머지는 컨베이어 사다리를 따른다 */
+  .ticks { display: flex; flex-direction: column; }
+  .tick {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    height: 32px;
+    padding-left: 12px;
+    transition: color var(--dur) var(--ease);
+    color: var(--ink-4);
+    text-decoration: none;
+  }
+  .tick .no {
+    font-family: var(--font-label);
+    font-weight: 600;
+    font-size: var(--t-meta);
+    font-variant-numeric: tabular-nums;
+    color: inherit;
+    transition: color var(--dur) var(--ease);
+  }
+  .tick .name { font-size: var(--t-meta); }
+  .tick[data-near="1"] { color: var(--ink-3); }
+  .tick[aria-current="true"] { color: var(--ink); }
+  .tick[aria-current="true"] .no { color: var(--accent); }
+  /* 바늘. 값(스크롤 위치)이 안 바뀌면 바늘도 안 움직인다 */
+  .tick[aria-current="true"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 5px;
+    width: 3px;
+    height: 22px;
+    background: var(--accent);
+    box-shadow: 0 0 9px var(--accent);
+  }
+
+  /* 바닥 판독 3줄 — 전부 사실이고 전부 정적이다 */
+  .readout { display: flex; flex-direction: column; gap: 14px; }
+  .readout div { display: flex; flex-direction: column; gap: 4px; }
+  .readout dt {
+    font-family: var(--font-label);
+    font-weight: 600;
+    font-size: var(--t-label);
+    letter-spacing: 1.6px;
+    color: var(--ink-4);
+  }
+  .readout dd { margin: 0; font-size: var(--t-meta); color: var(--ink-3); }
+
+  /* ── 라틴 대문자 라벨. 여기에 한글을 한 글자도 넣지 않는다 ───────────
+     넣으면 스택 중간에서 한글꼴로 떨어져 한 줄에 두 글꼴이 섞인다 (§3.5.1) */
+  .label {
+    font-family: var(--font-label);
+    font-weight: 600;
+    font-size: var(--t-label);
+    letter-spacing: 2.2px;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+  }
+  .mono-val {
+    font-family: var(--font-label);
+    font-weight: 600;
+    font-size: var(--t-meta);
+    letter-spacing: 0.6px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-4);
+  }
+
+  /* ── 잘린 조각들. 원형 불릿·둥근 알약은 한 개도 없다 ───────────────── */
+  .bullet {
+    width: 9px;
+    height: 9px;
+    flex: none;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
+  }
+  /* 꼬리 한 줄 앞의 막대. "▸" 글리프를 쓰지 않는 이유는 덱과 같다 —
+     이 화면의 표식은 글자가 아니라 빛나는 조각이어야 한다 */
+  .sowhat {
+    position: relative;
+    padding: 12px 0 0 28px;
+    border-top: 2px solid var(--rule);
+    color: var(--ink);
+  }
+  .sowhat::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 23px;
+    width: 16px;
+    height: 4px;
+    background: var(--accent);
+    box-shadow: 0 0 9px var(--accent);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+  }
+
+  /* ── 계기 행 (.stat 문법). 두 모서리만 자른다 ──────────────────────
+     작은 상자에서 네 모서리를 다 자르면 팔각형으로 보인다 */
+  .stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 14px 20px;
+    text-decoration: none;
+    border: 2px solid var(--rule-soft);
+    border-left: 4px solid var(--accent-dim);
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+    transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease);
+  }
+  /* §7.4 의 포인터 추적("테두리에서 가장 가까운 지점이 밝아진다")을 웹에서 할 수 있는
+     만큼만 옮긴 것. 마우스 좌표를 따라가는 빛은 만들지 않는다 */
+  .stat-row:hover,
+  .stat-row:focus-visible {
+    border-left-color: var(--accent);
+    box-shadow: inset 0 0 40px var(--glow-inner);
+  }
+  .stat-row.is-warn { border-left-color: var(--warn); }
+  .stat-row.is-warn:hover,
+  .stat-row.is-warn:focus-visible { border-left-color: var(--warn-text); }
+
+  /* ── 3층 챔퍼 판. **사이트 전체에 한 장뿐이다** ─────────────────────
+     두 장이 되는 순간 "카드 문법" 이 생기고, 세 장이면 그리드가 된다. */
+  .instr {
+    position: relative;
+    z-index: 0; /* 스태킹 컨텍스트를 여기서 닫는다 */
+    padding: 32px 36px 36px;
+    background: transparent;
+    clip-path: var(--clip-outer);
+  }
+  /* 1층 — 발광 테두리. 실루엣을 통째로 발광색으로 채우고 유리면을 한 겹 안쪽으로 얹어
+     가장자리만 남긴다. border 로는 잘린 모서리를 따라갈 수 없다 */
+  .instr::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    clip-path: var(--clip-outer);
+    background: linear-gradient(
+      158deg,
+      var(--accent) 0%,
+      var(--accent-dim) 34%,
+      var(--accent-dim) 66%,
+      var(--accent) 100%
+    );
+  }
+  /* 2층 — 유리면 + 스캔라인 + 안쪽으로 스미는 헤일로.
+     스캔라인은 이 판 한 장에만 깐다. 페이지 전면에 깔면 그게 곧 "의미 없는 배경" 이다 */
+  .instr::after {
+    content: "";
+    position: absolute;
+    inset: var(--edge);
+    z-index: 0;
+    clip-path: var(--clip-inner);
+    background:
+      repeating-linear-gradient(
+        180deg,
+        var(--scan) 0 var(--scan-width),
+        transparent var(--scan-width) var(--scan-pitch)
+      ),
+      var(--glass);
+    box-shadow: inset 0 0 56px var(--glow-inner);
+  }
+  /* 이 한 줄이 없으면 유리면이 글자를 덮는다 */
+  .instr > * { position: relative; z-index: 1; }
+
+  /* 상태 판독 3줄. 셋째만 꺼진 계기다 —
+     "완료는 밝기를 낮추는 쪽이 새 색을 하나 더 들이는 것보다 뜻이 정확하다" (STATE_COLOR) */
+  .lamp { display: flex; align-items: baseline; gap: 10px; }
+  .lamp i {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    transform: translateY(-2px);
+    clip-path: polygon(2px 0, 100% 0, 100% calc(100% - 2px), calc(100% - 2px) 100%, 0 100%, 0 2px);
+  }
+  .lamp.on i { background: var(--accent); box-shadow: 0 0 7px var(--accent); }
+  .lamp.wait i { background: var(--warn); box-shadow: 0 0 7px var(--warn); }
+  .lamp.off i { background: var(--ink-4); }
+
+  /* ── 기능 행. 카드가 아니다. 어떤 뷰포트에서도 다열 그리드가 되지 않는다 ── */
+  .feat {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    column-gap: 0;
+    padding: 22px 0 24px;
+    border-top: 1px solid var(--rule-soft);
+  }
+  /* 구역의 첫 행만 굵다. `:first-of-type` 를 쓰면 행마다 래퍼가 하나씩 있는 구조에서
+     전부 첫 행이 되어 여덟 줄이 같은 무게로 깔린다 — 그게 곧 카드 격자의 모습이다.
+     구조에 기대지 않게 데이터 속성으로 명시한다. */
+  .feat[data-first] { border-top: 2px solid var(--rule); }
+  .feat .no {
+    font-family: var(--font-label);
+    font-weight: 600;
+    font-size: var(--t-title);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-dim);
+  }
+  /* 번호 아래 세로 틱 — 눈금판의 눈금이다 */
+  .feat .no::after {
+    content: "";
+    display: block;
+    width: 2px;
+    height: 28px;
+    margin-top: 6px;
+    background: var(--rule-soft);
+  }
+  .feat h3 {
+    margin: 0 0 8px;
+    font-size: var(--t-body);
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+  .feat p { margin: 0; color: var(--ink-2); }
+
+  /* ── 구역 제목 ─────────────────────────────────────────── */
+  .sec-title {
+    margin: 0 0 20px;
+    text-wrap: balance;
+    font-size: var(--t-title);
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    color: var(--ink);
+    line-height: 1.24;
+  }
+
+  .lede { color: var(--ink-2); }
+
+  /* 본문 링크 — 밑줄 대신 아래 발광선 */
+  .tlink {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 2px solid var(--rule);
+    padding-bottom: 2px;
+    transition: border-color 160ms var(--ease), color 160ms var(--ease);
+  }
+  .tlink:hover, .tlink:focus-visible { border-bottom-color: var(--accent); color: var(--hot); }
+}
+
+/* ── 세로 리듬. 짧게 붙이고 길게 뗀다 — 붙이는 자리마다 이유가 하나씩 있다 ──
+   등간격 구간은 하나도 없다. 값은 ≥900px 기준이고 아래에서 ×0.62 로 내린다. */
+@layer components {
+  .sec-hero  { padding: 112px 0 88px; }
+  /* 위 64 는 히어로 아래 88 보다 **작다**. 3문장은 히어로의 각주지 새 장이 아니다 */
+  .sec-what  { padding: 64px 0 128px; }
+  .sec-feat  { padding: 128px 0 96px; }
+  /* 사이트에서 가장 좁은 48 — 기능 마지막 항목이 이 판으로 흘러 들어간 것처럼 읽힌다.
+     "웹사이트를 만든다"(기능)와 "그 결과물 주소"(이 판)는 같은 문장의 앞뒤다.
+     아래 136 은 사이트 최대 여백이다. 정직 문구 뒤의 침묵이고,
+     푸터가 그 문구에 달라붙어 변명처럼 보이는 것을 막는다 */
+  .sec-live  { padding: 48px 0 136px; }
+  .sec-foot  { padding: 32px 0 56px; }
+
+  .sec-fhead { padding: 64px 0 0; }   /* features.html 은 히어로가 없어 빨리 시작한다 */
+  .sec-flist { padding: 56px 0 0; }
+  /* 구역 사이도 등간격이 아니다 — 만든다→기억한다 96, 기억한다→펼친다 128.
+     인라인 style 로 주면 아래 좁은 화면 블록이 못 닿아 이 두 곳만 안 줄어든다. */
+  .sec-fgrp-b { padding-top: 96px; }
+  .sec-fgrp-c { padding-top: 128px; }
+  .sec-ffoot { padding: 96px 0 56px; }
+}
+
+/* ── 움직임은 두 곳뿐. 여기는 그중 하나(아크 트레이서)다 ───────────────
+   6.5s 는 §7.4 frame.tracerPeriodSeconds 의 idle 값 그대로. */
+@keyframes arc-tracer { to { transform: rotate(360deg); } }
+.tracer {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: arc-tracer 6.5s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tracer { animation: none; }
+  .tick { transition: none; }
+}
+
+/* ── 좁은 화면 ────────────────────────────────────────────
+   베젤을 풀어 상단 띠로 눕히고 눈금을 가로로 세운다. 여백은 전부 ×0.62 —
+   비율이 그대로라 불균등이 살아 있다. */
+@media (max-width: 899px) {
+  .shell {
+    display: block;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .bezel {
+    position: sticky;
+    top: 0;
+    height: auto;
+    z-index: 20;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 0;
+    background: var(--base);
+    border-bottom: 2px solid var(--rule-soft);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .bezel::-webkit-scrollbar { display: none; }
+  .bezel .rail, .bezel .readout, .bezel .spacer { display: none; }
+  .ticks { flex-direction: row; gap: 4px; }
+  .tick { height: 28px; padding: 0 8px; white-space: nowrap; }
+  /* 글자는 감추되 접근 가능한 이름은 남긴다 — display:none 이면 링크 이름이 "01" 만 된다 */
+  .tick .name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tick[aria-current="true"]::before { top: auto; bottom: 0; left: 8px; width: 14px; height: 3px; }
+
+  .sec-hero  { padding: 70px 0 54px; }
+  .sec-what  { padding: 40px 0 80px; }
+  .sec-feat  { padding: 80px 0 60px; }
+  .sec-live  { padding: 30px 0 84px; }
+  .sec-foot  { padding: 20px 0 36px; }
+  .sec-fhead { padding: 40px 0 0; }
+  .sec-flist { padding: 34px 0 0; }
+  .sec-fgrp-b { padding-top: 60px; }
+  .sec-fgrp-c { padding-top: 80px; }
+  .sec-ffoot { padding: 60px 0 36px; }
+
+  /* (E) 베젤이 상단 sticky 띠(10+28+10+2 = 50px)가 되므로 앵커 대상이 그 밑으로 들어간다 */
+  .shell [id] { scroll-margin-top: 62px; }
+
+  .instr { padding: 24px 22px 26px; }
+  .stat-row { flex-wrap: wrap; gap: 10px; }
+}
+
+/* ── 히어로와 아크 ───────────────────────────────────────── */
+@layer components {
+  .hero { position: relative; overflow: hidden; }
+  .hero-arc {
+    position: absolute;
+    top: 50%;
+    right: -300px;
+    translate: 0 -50%;
+    width: 900px;
+    height: 900px;
+    pointer-events: none;
+    /* 아크는 셋째 트랙(글자 0자)에서만 모습을 갖춘다. 왼쪽으로 갈수록 지워져
+       글줄 위를 지나가지 않는다 — 배경이 본문을 이기면 그게 곧 "의미 없는 배경" 이다 */
+    /* 마스크는 색이 아니라 알파다 — 검정/투명은 팔레트 값이 아니고 토큰화 대상도 아니다 */
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.18) 28%, #000 52%);
+    mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.18) 28%, #000 52%);
+  }
+  .h1 {
+    margin: 0;
+    text-wrap: balance;
+    font-size: var(--t-display);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    color: var(--ink);
+  }
+
+  /* 기능 행의 그림. 공통 48px 상자가 없고 크기도 앵커도 항목마다 다르다 —
+     아이콘 세트를 만들지 않았으므로 아이콘 세트로 보일 수 없다. */
+  .feat .body { position: relative; min-width: 0; }
+  .feat p { max-width: min(var(--w, 44ch), 100%); }
+  .feat[data-gutter] .no::after { display: none; }
+  .fig-right { position: absolute; right: 0; bottom: 2px; line-height: 0; }
+  .fig-mid { position: absolute; right: 0; top: 50%; translate: 0 -50%; line-height: 0; }
+  .fig-inline { float: left; margin: 2px 10px 0 0; line-height: 0; }
+  .fig-gutter { display: block; line-height: 0; }
+
+  .grp-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 14px;
+  }
+  .grp-head .name { font-size: var(--t-meta); letter-spacing: 1.2px; color: var(--ink-3); }
+}
+
+@media (max-width: 899px) {
+  .hero-arc { right: -430px; width: 720px; height: 720px; }
+  /* 좁은 화면에서는 베젤 띠가 이미 각인을 이고 있다 — 바로 아래에서 한 번 더 반복하지 않는다 */
+  .fhead-stamp { display: none; }
+  .h1 { font-size: clamp(30px, 8.6vw, 38px); }
+  .fig-right, .fig-mid { position: static; translate: none; display: block; margin-top: 14px; }
+}
+
+/* ── 라이브 빌드 판 내부 ──────────────────────────────────── */
+@layer components {
+  .live-grid {
+    display: grid;
+    grid-template-columns: 62% 1fr;
+    gap: 32px;
+  }
+  .lamps { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+  .lamp .label { letter-spacing: 1.6px; }
+  .lamp p { margin: 0; font-size: var(--t-meta); color: var(--ink-3); }
+}
+@media (max-width: 899px) {
+  .live-grid { grid-template-columns: 1fr; gap: 24px; }
+}
+
+/* ── 랜드마크 ────────────────────────────────────────────
+   푸터는 main 밖에 있어야 contentinfo 로 잡힌다(main 안의 footer 는 sectionfooter 다). */
+@layer components {
+  .shell > footer { grid-column: 2 / -1; min-width: 0; }
+
+  /* 건너뛰기 링크 — 베젤 눈금이 본문보다 앞에 있으므로 키보드로 통과할 길을 준다 */
+  .skip {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 60;
+    padding: 10px 16px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 2px solid var(--accent);
+    text-decoration: none;
+    transform: translateY(-250%);
+  }
+  .skip:focus { transform: none; }
+
+  /* 구역 이름은 heading 이다 — 시각은 그대로 두고 단계만 채운다 */
+  .grp-head h2.name { margin: 0; font-weight: 400; }
+}
+@media (max-width: 899px) {
+  .shell > footer { margin-top: 0; }
+}
