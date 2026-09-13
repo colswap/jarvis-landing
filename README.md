@@ -49,12 +49,33 @@ react-router 대신 **vite 의 MPA 설정**으로 html 엔트리를 둘 둔다
 
 ## GA4
 
-**아직 안 붙였다.** 측정 ID 가 나오면:
+측정 ID 는 **코드에 없다.** `src/analytics.ts` 가 빌드 시점에 `VITE_GA_ID` 를 읽고,
+값이 비어 있으면 스크립트조차 내려받지 않는다.
 
-1. `index.html` 과 `features.html` 의 `<head>` 주석 자리에 **같은 gtag 스니펫**을 넣는다.
-   두 페이지가 주소로 갈리므로 페이지 구분은 저절로 된다.
-2. 클릭 이벤트가 필요하면 위임 리스너 한 줄이면 된다 — 인라인 핸들러는 0 개이고
-   링크에 `data-ga` 가 이미 붙어 있다: `demo_video` · `live_build` · `nav_features` · `nav_home`.
+Vercel → Settings → Environment Variables:
+
+| Key | Value | Environments |
+|---|---|---|
+| `VITE_GA_ID` | `G-` 로 시작하는 측정 ID | **Production 만** |
+
+Production 에만 넣는 이유는 보안이 아니다 — 측정 ID 는 비밀이 아니고 페이지 소스에
+그대로 노출된다. 이유는 **지표 오염**이다. 로컬 `npm run dev`·프리뷰 배포·리허설이
+같은 속성으로 들어가면 "심사위원이 몇 명 들어왔나" 를 못 센다.
+
+⚠️ `import.meta.env` 는 빌드 시점에 박힌다. 값을 넣거나 바꾼 뒤에는 **재배포해야** 반영된다.
+
+로컬에서 시험하려면 `.env.local` 에 `VITE_GA_ID=G-...`(gitignore 됨). 단, 그 순간부터
+로컬 트래픽이 실제 속성으로 들어간다.
+
+잡히는 것:
+
+- `page_view` — 두 페이지가 주소(`/` · `/features.html`)로 갈린다. MPA 로 만든 이유다
+- 커스텀 이벤트 4종 — `demo_video` · `live_build` · `nav_features` · `nav_home`.
+  위임 리스너 하나가 `[data-ga]` 를 받는다(인라인 핸들러 0 개). 파라미터로 `link_url` 과
+  `placement`(그 링크가 있던 구역 id)를 같이 보낸다 — 같은 링크가 히어로와 푸터 양쪽에
+  있어서, 이게 없으면 둘이 합산돼 어느 자리가 먹히는지 못 본다
+- GA4 향상된 측정이 외부 링크를 `click` 으로도 자동 수집한다. 우리 이벤트와 이름이 달라
+  중복 집계가 아니라 별개 기록이다
 
 ## 두 외부 링크
 
