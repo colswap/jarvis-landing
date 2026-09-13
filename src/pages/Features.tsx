@@ -64,7 +64,7 @@ export function Features() {
             <a className="tlink" href={LINKS.live} target="_blank" rel="noopener" data-ga="live_build">
               지금 만들어지고 있는 것
             </a>{" "}
-            — 빌드가 돌고 있지 않으면 빈 화면이다.
+            — 빌드가 돌고 있지 않으면 열리지 않는다.
           </p>
           <p style={{ margin: 0, color: "var(--ink-4)", fontSize: "var(--t-meta)" }}>
             {LINKS.liveLabel}
